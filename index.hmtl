@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>US Government Dart Quiz</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
+  #quiz, #dartGame { margin-top: 20px; }
+  .button { margin: 5px; padding: 10px 20px; cursor: pointer; }
+  #dartBoard { border: 2px solid #000; background: #fff; margin: 20px auto; display: block; }
+</style>
+</head>
+<body>
+<h1>US Government Dart Quiz</h1>
+<p>Answer questions correctly to throw a dart!</p>
+<div id="score">Score: 0</div>
+
+<div id="quiz">
+  <div id="question"></div>
+  <div id="answers"></div>
+</div>
+
+<canvas id="dartBoard" width="400" height="400"></canvas>
+<script>
+const questions = [
+  { question: "Who is the current President of the United States?", answers: ["Joe Biden", "Donald Trump", "Barack Obama"], correct: 0 },
+  { question: "How many senators are in the US Senate?", answers: ["50", "100", "435"], correct: 1 },
+  { question: "Which branch of government interprets the law?", answers: ["Legislative", "Executive", "Judicial"], correct: 2 }
+];
+
+let score = 0;
+let currentQuestion = 0;
+const scoreEl = document.getElementById('score');
+const questionEl = document.getElementById('question');
+const answersEl = document.getElementById('answers');
+
+function loadQuestion() {
+  if(currentQuestion >= questions.length){
+    questionEl.innerText = "Quiz complete!";
+    answersEl.innerHTML = "";
+    return;
+  }
+  const q = questions[currentQuestion];
+  questionEl.innerText = q.question;
+  answersEl.innerHTML = '';
+  q.answers.forEach((ans, index) => {
+    const btn = document.createElement('button');
+    btn.innerText = ans;
+    btn.className = 'button';
+    btn.onclick = () => checkAnswer(index);
+    answersEl.appendChild(btn);
+  });
+}
+
+function checkAnswer(index) {
+  if(index === questions[currentQuestion].correct) {
+    score++;
+    scoreEl.innerText = `Score: ${score}`;
+    alert("Correct! You can throw a dart.");
+    throwDart();
+  } else {
+    alert("Incorrect! Try the next question.");
+  }
+  currentQuestion++;
+  loadQuestion();
+}
+
+// Simple dart game logic
+const canvas = document.getElementById('dartBoard');
+const ctx = canvas.getContext('2d');
+
+function drawBoard() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = 'red';
+  ctx.beginPath();
+  ctx.arc(200,200,20,0,Math.PI*2); // Bullseye
+  ctx.fill();
+  ctx.stroke();
+}
+drawBoard();
+
+function throwDart() {
+  const x = Math.random() * 400;
+  const y = Math.random() * 400;
+  ctx.fillStyle = 'blue';
+  ctx.beginPath();
+  ctx.arc(x,y,5,0,Math.PI*2);
+  ctx.fill();
+}
+
+loadQuestion();
+</script>
+</body>
+</html>
