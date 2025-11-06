@@ -2,28 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>US Gov Dart Challenge </title>
+<title>US Gov Dart Challenge - Ultimate GamePigeon</title>
 <style>
-body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; }
+body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; overflow-x:hidden;}
 h1{color:#1a3c6d; margin-top:20px;}
-#playerSelect, #gameContainer{margin-top:20px;}
 button{margin:5px;padding:10px 18px;border:none;border-radius:6px;background:#1a3c6d;color:white;cursor:pointer;font-size:16px;}
 button:hover{background:#345b8c;}
+#playerSelect, #gameContainer{margin-top:20px;}
 #questionBox{background:#fff;padding:20px;margin:0 auto;width:60%;border-radius:10px;box-shadow:0 0 10px #aaa;}
 #answers button{display:block;width:200px;margin:5px auto;}
-#dartContainer{position:relative; margin:30px auto; width:400px; height:400px; border-radius:50%; overflow:hidden; background:#eee; border:3px solid #1a3c6d;}
+#dartContainer{position:relative; margin:30px auto; width:400px; height:400px; border-radius:50%; overflow:hidden; background:#eee; border:5px solid #1a3c6d;}
 .dart{width:12px;height:12px;background:black;position:absolute;border-radius:50%; z-index:2;}
-#controls{margin-top:20px;}
 #powerBar{height:20px;width:200px;background:lightgray;border-radius:5px;margin:10px auto;overflow:hidden;}
 .power{height:100%;width:0%;background:limegreen;}
 #scoreBoard{margin-top:20px;font-size:18px;color:#1a3c6d;}
 .trajectory{position:absolute;width:6px;height:6px;background:rgba(0,0,0,0.3);border-radius:50%;z-index:1;}
-.firework{position:absolute;width:4px;height:4px;background:yellow;border-radius:50%;}
+.firework{position:absolute;width:4px;height:4px;background:yellow;border-radius:50%;z-index:3;}
+.ring{position:absolute;border-radius:50%;pointer-events:none;}
 </style>
 </head>
 <body>
 
 <h1>🎯 US Gov Dart Challenge</h1>
+
 <div id="playerSelect">
   <h3>Select Mode:</h3>
   <button onclick="startSingle()">Single Player</button>
@@ -103,6 +104,7 @@ function startGame(){
   gameContainer.style.display="block";
   index=0; currentPlayer=0;
   renderScore();
+  drawDartboard();
   loadQuestion();
 }
 
@@ -124,6 +126,7 @@ function loadQuestion(){
   wind = (Math.random()-0.5)*20;
   windInfo.textContent = `Wind: ${wind.toFixed(1)} units`;
   throwsLeft = 3;
+  prepareDart();
 }
 
 function checkAnswer(i){
@@ -131,15 +134,14 @@ function checkAnswer(i){
     players[currentPlayer].score += 10;
   }
   renderScore();
-  prepareDart();
 }
 
 function prepareDart(){
-  dartContainer.innerHTML = "";
+  dartContainer.innerHTML="";
   currentDart = document.createElement("div");
   currentDart.className="dart";
-  currentDart.style.left = "194px";
-  currentDart.style.bottom = "0px";
+  currentDart.style.left="194px";
+  currentDart.style.bottom="0px";
   dartContainer.appendChild(currentDart);
   setupDrag();
 }
@@ -147,43 +149,40 @@ function prepareDart(){
 function setupDrag(){
   isDragging=false;
   const trajectoryDots = [];
-  dartContainer.onmousedown = (e)=>{
-    isDragging = true;
-    startX = e.offsetX;
-    startY = e.offsetY;
-    power=0;
-    powerFill.style.width="0%";
+  dartContainer.onmousedown=(e)=>{
+    isDragging=true;
+    startX=e.offsetX; startY=e.offsetY;
+    power=0; powerFill.style.width="0%";
   };
-  dartContainer.onmousemove = (e)=>{
+  dartContainer.onmousemove=(e)=>{
     if(isDragging){
       let dx = e.offsetX - startX;
       let dy = startY - e.offsetY;
       angle = Math.atan2(dy, dx);
-      power = Math.min(Math.sqrt(dx*dx+dy*dy), 100);
-      powerFill.style.width = power+"%";
+      power = Math.min(Math.sqrt(dx*dx+dy*dy), 120);
+      powerFill.style.width=power+"%";
 
       trajectoryDots.forEach(d=>d.remove());
       trajectoryDots.length=0;
 
-      // Draw preview
       let tempX=194,tempY=0;
-      let velX = power*Math.cos(angle)/2;
-      let velY = power*Math.sin(angle)/2;
+      let velX=power*Math.cos(angle)/2;
+      let velY=power*Math.sin(angle)/2;
       for(let t=0;t<50;t++){
-        velY -= 0.5;
-        tempX += velX + wind*0.05;
-        tempY += velY;
+        velY-=0.5;
+        tempX+=velX+wind*0.05;
+        tempY+=velY;
         if(tempY<0) break;
-        let dot = document.createElement("div");
+        let dot=document.createElement("div");
         dot.className="trajectory";
-        dot.style.left = tempX+"px";
-        dot.style.bottom = tempY+"px";
+        dot.style.left=tempX+"px";
+        dot.style.bottom=tempY+"px";
         dartContainer.appendChild(dot);
         trajectoryDots.push(dot);
       }
     }
   };
-  dartContainer.onmouseup = (e)=>{
+  dartContainer.onmouseup=(e)=>{
     if(isDragging){
       isDragging=false;
       powerFill.style.width="0%";
@@ -194,17 +193,17 @@ function setupDrag(){
 }
 
 function throwDart(a,p){
-  let velX = p*Math.cos(a)/2;
-  let velY = p*Math.sin(a)/2;
-  let dart = currentDart;
-  let posX = 194;
-  let posY = 0;
-  let interval = setInterval(()=>{
-    velY -= 0.5;
-    posX += velX + wind*0.05;
-    posY += velY;
-    dart.style.left = posX+"px";
-    dart.style.bottom = posY+"px";
+  let velX=p*Math.cos(a)/2;
+  let velY=p*Math.sin(a)/2;
+  let dart=currentDart;
+  let posX=194;
+  let posY=0;
+  let interval=setInterval(()=>{
+    velY-=0.5;
+    posX+=velX+wind*0.05;
+    posY+=velY;
+    dart.style.left=posX+"px";
+    dart.style.bottom=posY+"px";
     if(posY<=0){
       posY=0;
       clearInterval(interval);
@@ -220,62 +219,72 @@ function throwDart(a,p){
 }
 
 function stickDart(x,y){
-  currentDart.style.left = x+"px";
-  currentDart.style.bottom = y+"px";
+  currentDart.style.left=x+"px";
+  currentDart.style.bottom=y+"px";
   scoreDart(x,y);
 }
 
 function scoreDart(x,y){
-  let centerX = 200;
-  let centerY = 200;
-  let dx = x - centerX;
-  let dy = y - centerY;
-  let dist = Math.sqrt(dx*dx + dy*dy);
+  let centerX=200,centerY=200;
+  let dx=x-centerX;
+  let dy=y-centerY;
+  let dist=Math.sqrt(dx*dx+dy*dy);
   let points=0;
-  if(dist<=40) points=50;
-  else if(dist<=120) points=25;
-  else if(dist<=200) points=10;
-  players[currentPlayer].score += points;
+  if(dist<=20) points=50;
+  else if(dist<=60) points=25;
+  else if(dist<=120) points=10;
+  players[currentPlayer].score+=points;
   renderScore();
-  if(points>0) fireworks(centerX,200);
+  if(points>0) fireworks(x,y);
 }
 
 function fireworks(x,y){
   for(let i=0;i<30;i++){
-    let f = document.createElement("div");
+    let f=document.createElement("div");
     f.className="firework";
-    f.style.left = x+"px";
-    f.style.bottom = y+"px";
+    f.style.left=x+"px";
+    f.style.bottom=y+"px";
     dartContainer.appendChild(f);
-    let angle = Math.random()*2*Math.PI;
-    let speed = Math.random()*5+2;
-    let interval = setInterval(()=>{
-      let left = parseFloat(f.style.left);
-      let bottom = parseFloat(f.style.bottom);
-      f.style.left = left + speed*Math.cos(angle) + "px";
-      f.style.bottom = bottom + speed*Math.sin(angle) + "px";
-      speed *=0.95;
-    },20);
-    setTimeout(()=>f.remove(),1000);
+    let angle=Math.random()*2*Math.PI;
+    let speed=Math.random()*5+2;
+    let interval=setInterval(()=>{
+      let left=parseFloat(f.style.left);
+      let bottom=parseFloat(f.style.bottom);
+      left+=Math.cos(angle)*speed;
+      bottom+=Math.sin(angle)*speed;
+      speed*=0.95;
+      f.style.left=left+"px";
+      f.style.bottom=bottom+"px";
+      if(speed<0.1) { clearInterval(interval); f.remove(); }
+    },30);
   }
 }
 
 function nextTurn(){
-  currentPlayer++;
-  if(currentPlayer >= players.length){
-    currentPlayer=0;
-    index++;
-  }
+  index++;
+  currentPlayer=(currentPlayer+1)%players.length;
   loadQuestion();
 }
 
 function endGame(){
-  qBox.textContent="All questions answered!";
-  ansBox.innerHTML="";
-  result.textContent="Game over!";
   let winner = players.reduce((a,b)=>a.score>b.score?a:b);
-  scoreBoard.innerHTML += `<br>Winner: ${winner.name} with ${winner.score} points!`;
+  result.textContent = `Game Over! Winner: ${winner.name} 🎉`;
+}
+
+function drawDartboard(){
+  dartContainer.innerHTML="";
+  const rings=[120,"#ffd700",60,"#c0c0c0",20,"#ff4500"];
+  for(let i=0;i<rings.length;i+=2){
+    let r=document.createElement("div");
+    r.className="ring";
+    r.style.width=r.style.height=(rings[i]*2)+"px";
+    r.style.left=(200-rings[i])+"px";
+    r.style.bottom=(200-rings[i])+"px";
+    r.style.background=rings[i+1];
+    dartContainer.appendChild(r);
+  }
 }
 </script>
+
 </body>
 </html>
