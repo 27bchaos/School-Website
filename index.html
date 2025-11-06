@@ -2,26 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>US Gov Dart Challenge - Advanced</title>
+<title>US Gov Dart Challenge - GamePigeon Style</title>
 <style>
-body { font-family: sans-serif; background:#e3eefc; text-align:center; }
-h1{color:#1a3c6d;}
-#gameContainer{margin-top:20px;}
-#questionBox{background:#fff;padding:20px;margin:0 auto;width:60%;border-radius:10px;box-shadow:0 0 10px #aaa;}
-button{margin:5px;padding:10px 18px;border:none;border-radius:6px;background:#1a3c6d;color:white;cursor:pointer;}
+body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; }
+h1{color:#1a3c6d; margin-top:20px;}
+#playerSelect, #gameContainer{margin-top:20px;}
+button{margin:5px;padding:10px 18px;border:none;border-radius:6px;background:#1a3c6d;color:white;cursor:pointer;font-size:16px;}
 button:hover{background:#345b8c;}
-#dartboard{margin:30px auto;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle, red 0 40px, yellow 40px 80px, green 80px 120px, blue 120px 160px, white 160px 200px);position:relative;overflow:hidden;}
-.dart{width:10px;height:30px;background:black;position:absolute;border-radius:3px;}
-#playerSelect,#dartSelect,#launchControls{margin-top:20px;}
+#questionBox{background:#fff;padding:20px;margin:0 auto;width:60%;border-radius:10px;box-shadow:0 0 10px #aaa;}
+#answers button{display:block;width:200px;margin:5px auto;}
+#dartContainer{position:relative; margin:30px auto; width:400px; height:400px; border-radius:50%; overflow:hidden; background:#eee;}
+.dart{width:12px;height:12px;background:black;position:absolute;border-radius:50%;}
+#controls{margin-top:20px;}
 #powerBar{height:20px;width:200px;background:lightgray;border-radius:5px;margin:10px auto;overflow:hidden;}
 .power{height:100%;width:0%;background:limegreen;}
-#scoreBoard{margin-top:10px;font-weight:bold;}
+#scoreBoard{margin-top:20px;font-size:18px;color:#1a3c6d;}
+.firework{position:absolute;width:4px;height:4px;background:yellow;border-radius:50%;}
 </style>
 </head>
 <body>
 
 <h1>🎯 US Gov Dart Challenge</h1>
-
 <div id="playerSelect">
   <h3>Select Mode:</h3>
   <button onclick="startSingle()">Single Player</button>
@@ -36,21 +37,14 @@ button:hover{background:#345b8c;}
 
   <div id="scoreBoard"></div>
 
-  <div id="dartSelect" style="display:none;">
-    <h3>Select Your Dart:</h3>
-    <button onclick="selectDart('red')">🔴 Red</button>
-    <button onclick="selectDart('blue')">🔵 Blue</button>
-    <button onclick="selectDart('green')">🟢 Green</button>
+  <div id="dartContainer"></div>
+
+  <div id="controls">
+    <h3>Drag to set power & angle, release to throw!</h3>
+    <div id="powerBar"><div class="power" id="powerFill"></div></div>
+    <p id="windInfo"></p>
   </div>
 
-  <div id="launchControls" style="display:none;">
-    <label>Power: <input type="range" id="powerSlider" min="10" max="100" value="50"></label><br>
-    <label>Angle: <input type="range" id="angleSlider" min="10" max="80" value="45"></label><br>
-    <label>Wind: <input type="range" id="windSlider" min="-20" max="20" value="0"></label><br>
-    <button onclick="launchDart()">Launch Dart</button>
-  </div>
-
-  <div id="dartboard"></div>
   <h2 id="result"></h2>
 </div>
 
@@ -75,19 +69,27 @@ const questions = [
 
 let players = [];
 let currentPlayer = 0;
-let questionIndex = 0;
-let selectedDart = 'black';
-const dartboard = document.getElementById('dartboard');
+let index = 0;
+let dartContainer = document.getElementById('dartContainer');
+let powerFill = document.getElementById('powerFill');
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+let angle = 0;
+let power = 0;
+let currentDart = null;
+let wind = 0;
+
 const qBox = document.getElementById('question');
 const ansBox = document.getElementById('answers');
 const result = document.getElementById('result');
+const gameContainer = document.getElementById('gameContainer');
+const playerSelect = document.getElementById('playerSelect');
 const scoreBoard = document.getElementById('scoreBoard');
+const windInfo = document.getElementById('windInfo');
 
-function startSingle() {
-  players = [{name:"Player 1", score:0}];
-  startGame();
-}
-
+// Player setup
+function startSingle() { players = [{name:"Player 1", score:0}]; startGame(); }
 function startMulti() {
   const p1 = prompt("Enter Player 1 Name:", "Player 1");
   const p2 = prompt("Enter Player 2 Name:", "Player 2");
@@ -95,10 +97,11 @@ function startMulti() {
   startGame();
 }
 
-function startGame() {
-  document.getElementById('playerSelect').style.display="none";
-  document.getElementById('gameContainer').style.display="block";
-  questionIndex=0; currentPlayer=0;
+// Game flow
+function startGame(){
+  playerSelect.style.display="none";
+  gameContainer.style.display="block";
+  index=0; currentPlayer=0;
   renderScore();
   loadQuestion();
 }
@@ -108,11 +111,8 @@ function renderScore(){
 }
 
 function loadQuestion(){
-  if(questionIndex>=questions.length){
-    prepareDartPhase();
-    return;
-  }
-  const q = questions[questionIndex];
+  if(index >= questions.length){ endGame(); return; }
+  const q = questions[index];
   qBox.textContent = `${players[currentPlayer].name}'s turn: ${q.q}`;
   ansBox.innerHTML = "";
   q.a.forEach((opt,i)=>{
@@ -121,98 +121,134 @@ function loadQuestion(){
     btn.onclick = ()=>checkAnswer(i);
     ansBox.appendChild(btn);
   });
+  wind = (Math.random()-0.5)*20;
+  windInfo.textContent = `Wind: ${wind.toFixed(1)} units`;
 }
 
+// Check answer & update score
 function checkAnswer(i){
-  if(i === questions[questionIndex].c){
-    players[currentPlayer].score++;
+  if(i === questions[index].c){
+    players[currentPlayer].score += 10; // bonus for correct answer
   }
   renderScore();
+  prepareDart();
+}
+
+// Dart mechanics
+function prepareDart(){
+  dartContainer.innerHTML = "";
+  currentDart = document.createElement("div");
+  currentDart.className="dart";
+  currentDart.style.left = "190px";
+  currentDart.style.bottom = "0px";
+  dartContainer.appendChild(currentDart);
+  setupDrag();
+}
+
+function setupDrag(){
+  isDragging=false;
+  dartContainer.onmousedown = (e)=>{
+    isDragging = true;
+    startX = e.offsetX;
+    startY = e.offsetY;
+    power=0;
+    powerFill.style.width="0%";
+  };
+  dartContainer.onmousemove = (e)=>{
+    if(isDragging){
+      let dx = e.offsetX - startX;
+      let dy = startY - e.offsetY;
+      angle = Math.atan2(dy, dx);
+      power = Math.min(Math.sqrt(dx*dx+dy*dy), 100);
+      powerFill.style.width = power+"%";
+    }
+  };
+  dartContainer.onmouseup = (e)=>{
+    if(isDragging){
+      isDragging=false;
+      powerFill.style.width="0%";
+      throwDart(angle,power);
+    }
+  };
+}
+
+// Throw dart with physics
+function throwDart(a,p){
+  let velX = p*Math.cos(a)/2;
+  let velY = p*Math.sin(a)/2;
+  let dart = currentDart;
+  let posX = 190;
+  let posY = 0;
+  let interval = setInterval(()=>{
+    velY -= 0.5; // gravity
+    posX += velX + wind*0.05;
+    posY += velY;
+    dart.style.left = posX+"px";
+    dart.style.bottom = posY+"px";
+    if(posY<=0){
+      posY=0;
+      clearInterval(interval);
+      scoreDart(posX,posY);
+      nextTurn();
+    }
+  },20);
+}
+
+// Score calculation based on dartboard rings
+function scoreDart(x,y){
+  let centerX = 200;
+  let centerY = 200;
+  let dx = x - centerX;
+  let dy = y - centerY;
+  let dist = Math.sqrt(dx*dx + dy*dy);
+  let points=0;
+  if(dist<=40) points=50; // red bullseye
+  else if(dist<=120) points=25; // inner white
+  else if(dist<=200) points=10; // blue
+  players[currentPlayer].score += points;
+  renderScore();
+  if(points>0) fireworks(centerX,200);
+}
+
+// Fireworks effect
+function fireworks(x,y){
+  for(let i=0;i<30;i++){
+    let f = document.createElement("div");
+    f.className="firework";
+    f.style.left = x+"px";
+    f.style.bottom = y+"px";
+    dartContainer.appendChild(f);
+    let angle = Math.random()*2*Math.PI;
+    let speed = Math.random()*5+2;
+    let interval = setInterval(()=>{
+      let left = parseFloat(f.style.left);
+      let bottom = parseFloat(f.style.bottom);
+      f.style.left = left + speed*Math.cos(angle) + "px";
+      f.style.bottom = bottom + speed*Math.sin(angle) + "px";
+      speed *=0.95;
+    },20);
+    setTimeout(()=>f.remove(),1000);
+  }
+}
+
+// Next player/question
+function nextTurn(){
   currentPlayer++;
-  if(currentPlayer>=players.length){
+  if(currentPlayer >= players.length){
     currentPlayer=0;
-    questionIndex++;
+    index++;
   }
   loadQuestion();
 }
 
-// --- Dart Phase ---
-function prepareDartPhase(){
-  qBox.textContent="All questions answered! Select your dart.";
-  ansBox.innerHTML="";
-  document.getElementById('dartSelect').style.display='block';
-}
-
-function selectDart(color){
-  selectedDart = color;
-  document.getElementById('dartSelect').style.display='none';
-  document.getElementById('launchControls').style.display='block';
-  result.textContent=`${players[currentPlayer].name}, adjust power, angle, wind, then launch!`;
-}
-
-// Launch dart with physics
-function launchDart(){
-  const power = Number(document.getElementById('powerSlider').value);
-  const angle = Number(document.getElementById('angleSlider').value);
-  const wind = Number(document.getElementById('windSlider').value);
-
-  const dart = document.createElement('div');
-  dart.className='dart';
-  dart.style.background = selectedDart;
-  dartboard.appendChild(dart);
-
-  let posX = 180, posY = 0;
-  let rad = angle * Math.PI / 180;
-  let velX = power * Math.cos(rad)/2 + wind; 
-  let velY = power * Math.sin(rad)/2;
-  const gravity = 1;
-
-  const interval = setInterval(()=>{
-    posX += velX;
-    posY += velY;
-    velY -= gravity;
-    if(posY<=0){
-      posY=0; clearInterval(interval);
-      dartScore(dart,posX,posY);
-    }
-    dart.style.left = posX + 'px';
-    dart.style.bottom = posY + 'px';
-  },20);
-}
-
-// Score based on landing
-function dartScore(dart,x,y){
-  const center = 200; // center of dartboard
-  const dx = x-center; const dy = y-center;
-  const distance = Math.sqrt(dx*dx + dy*dy);
-  let points=0;
-  if(distance<40) points=10;
-  else if(distance<80) points=8;
-  else if(distance<120) points=6;
-  else if(distance<160) points=4;
-  else points=2;
-  players[currentPlayer].score += points;
-  renderScore();
-  nextDartTurn();
-}
-
-function nextDartTurn(){
-  currentPlayer++;
-  if(currentPlayer>=players.length){
-    endGame();
-  } else {
-    document.getElementById('launchControls').style.display='block';
-    result.textContent=`${players[currentPlayer].name}, adjust power, angle, wind, then launch!`;
-  }
-}
-
+// End game
 function endGame(){
-  document.getElementById('launchControls').style.display='none';
-  let maxScore = Math.max(...players.map(p=>p.score));
-  let winners = players.filter(p=>p.score===maxScore).map(p=>p.name).join(", ");
-  result.textContent = `🏆 Winner(s): ${winners} with ${maxScore} points!`;
+  qBox.textContent="All questions answered!";
+  ansBox.innerHTML="";
+  result.textContent="Game over!";
+  let winner = players.reduce((a,b)=>a.score>b.score?a:b);
+  scoreBoard.innerHTML += `<br>Winner: ${winner.name} with ${winner.score} points!`;
 }
-
 </script>
 
 </body>
