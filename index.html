@@ -71,9 +71,9 @@ let angle = 0, power = 0;
 let currentDart = null;
 let wind = 0;
 let throwsLeft = 3;
-let holdTimer = null;
 let countdownInterval = null;
 let countdown = 0;
+let canThrow = false;
 
 const qBox = document.getElementById('question');
 const ansBox = document.getElementById('answers');
@@ -118,19 +118,25 @@ function loadQuestion(){
   wind = (Math.random()-0.5)*20;
   windInfo.textContent = `💨 Wind: ${wind.toFixed(1)} units`;
   throwsLeft = 3;
-  prepareDart();
+  canThrow = false;
+  dartContainer.innerHTML = ""; // clear board until answer is given
+  drawDartboard();
 }
 
 function checkAnswer(i){
-  // ✅ Only reward with dart throws, not score directly
   if(i !== questions[index].c){
-    alert("Incorrect! You can still try to hit for points!");
+    alert("Incorrect! You lose your turn.");
+    // Move to next player/question
+    nextTurn();
   } else {
-    alert("Correct! Now aim carefully!");
+    alert("Correct! You get to throw darts!");
+    canThrow = true;
+    prepareDart();
   }
 }
 
 function prepareDart(){
+  if(!canThrow) return;
   dartContainer.innerHTML="";
   drawDartboard();
   currentDart = document.createElement("div");
@@ -154,6 +160,7 @@ function setupDrag(){
   dartContainer.appendChild(countdownText);
 
   dartContainer.onmousedown=(e)=>{
+    if(!canThrow) return;
     isDragging=true;
     startX=e.offsetX; startY=e.offsetY;
     power=0; powerFill.style.width="0%";
@@ -162,7 +169,7 @@ function setupDrag(){
     countdownInterval = setInterval(()=>{
       countdown--;
       countdownText.textContent = `Hold steady... ${countdown}`;
-      // Wind wobbles the mouse aim slightly
+      // Wind wobbles the aim slightly during hold
       startX += wind * 0.1;
       if(countdown<=0){
         clearInterval(countdownInterval);
@@ -194,6 +201,7 @@ function setupDrag(){
 }
 
 function throwDart(a,p){
+  if(!canThrow) return;
   let velX=p*Math.cos(a)/2;
   let velY=p*Math.sin(a)/2;
   let dart=currentDart;
@@ -284,7 +292,7 @@ function drawDartboard(){
     r.style.opacity="0.8";
     dartContainer.appendChild(r);
 
-    // ✅ Add score labels on the rings
+    // Score label
     let label = document.createElement("div");
     label.textContent = (rings[i]===20? "50 pts" : rings[i]===60? "25 pts" : "10 pts");
     label.style.position="absolute";
@@ -297,3 +305,4 @@ function drawDartboard(){
   }
 }
 </script>
+
