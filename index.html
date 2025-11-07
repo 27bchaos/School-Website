@@ -50,6 +50,7 @@ button:hover{background:#345b8c;}
   <h2 id="result"></h2>
 </div>
 
+
 <script>
 const questions = [
   {q:"Which branch of government makes the laws?", a:["Legislative","Executive","Judicial"], c:0},
@@ -65,9 +66,7 @@ let currentPlayer = 0;
 let index = 0;
 let dartContainer = document.getElementById('dartContainer');
 let powerFill = document.getElementById('powerFill');
-let isDragging = false;
-let startX = 0, startY = 0;
-let angle = 0, power = 0;
+let isHolding = false;
 let currentDart = null;
 let wind = 0;
 let throwsLeft = 3;
@@ -116,20 +115,19 @@ function loadQuestion(){
     ansBox.appendChild(btn);
   });
   wind = (Math.random()-0.5)*20;
-  windInfo.textContent = `💨 Wind: ${wind.toFixed(1)} units`;
+  windInfo.textContent = `💨 Wind strength: ${wind.toFixed(1)} units`;
   throwsLeft = 3;
   canThrow = false;
-  dartContainer.innerHTML = ""; // clear board until answer is given
+  dartContainer.innerHTML="";
   drawDartboard();
 }
 
 function checkAnswer(i){
   if(i !== questions[index].c){
-    alert("Incorrect! You lose your turn.");
-    // Move to next player/question
-    nextTurn();
+    alert("❌ Incorrect! You lose your turn.");
+    nextTurn(true); // skip to next
   } else {
-    alert("Correct! You get to throw darts!");
+    alert("✅ Correct! You get to throw darts!");
     canThrow = true;
     prepareDart();
   }
@@ -144,11 +142,10 @@ function prepareDart(){
   currentDart.style.left="194px";
   currentDart.style.bottom="0px";
   dartContainer.appendChild(currentDart);
-  setupDrag();
+  setupHoldThrow();
 }
 
-function setupDrag(){
-  isDragging=false;
+function setupHoldThrow(){
   let countdownText = document.createElement("div");
   countdownText.style.position="absolute";
   countdownText.style.top="10px";
@@ -159,51 +156,65 @@ function setupDrag(){
   countdownText.style.fontWeight="bold";
   dartContainer.appendChild(countdownText);
 
-  dartContainer.onmousedown=(e)=>{
-    if(!canThrow) return;
-    isDragging=true;
-    startX=e.offsetX; startY=e.offsetY;
-    power=0; powerFill.style.width="0%";
+  let previewDots = [];
+
+  dartContainer.onmousedown=()=>{
+    if(!canThrow || isHolding) return;
+    isHolding=true;
     countdown=5;
-    countdownText.textContent = `Hold steady... ${countdown}`;
-    countdownInterval = setInterval(()=>{
+    countdownText.textContent=`Holding... ${countdown}`;
+    let power = 100; // fixed power for simplicity
+    let angle = Math.PI/3; // 60° throw angle
+    drawTrajectory(previewDots, power, angle);
+
+    countdownInterval=setInterval(()=>{
       countdown--;
-      countdownText.textContent = `Hold steady... ${countdown}`;
-      // Wind wobbles the aim slightly during hold
-      startX += wind * 0.1;
+      countdownText.textContent=`Holding... ${countdown}`;
       if(countdown<=0){
         clearInterval(countdownInterval);
-        isDragging=false;
-        countdownText.textContent = "";
-        throwDart(angle,power);
+        countdownText.textContent="";
+        isHolding=false;
+        previewDots.forEach(d=>d.remove());
+        throwDart(power,angle);
       }
     },1000);
   };
 
-  dartContainer.onmousemove=(e)=>{
-    if(isDragging){
-      let dx = e.offsetX - startX;
-      let dy = startY - e.offsetY;
-      angle = Math.atan2(dy, dx);
-      power = Math.min(Math.sqrt(dx*dx+dy*dy), 120);
-      powerFill.style.width=power+"%";
-    }
-  };
-
   dartContainer.onmouseup=()=>{
-    if(isDragging){
-      isDragging=false;
+    if(isHolding){
       clearInterval(countdownInterval);
-      countdownText.textContent = "Cancelled throw!";
+      isHolding=false;
+      countdownText.textContent="Cancelled!";
       setTimeout(()=>countdownText.remove(),1000);
+      previewDots.forEach(d=>d.remove());
     }
   };
 }
 
-function throwDart(a,p){
-  if(!canThrow) return;
-  let velX=p*Math.cos(a)/2;
-  let velY=p*Math.sin(a)/2;
+function drawTrajectory(previewDots, power, angle){
+  previewDots.forEach(d=>d.remove());
+  previewDots.length=0;
+  let tempX=194, tempY=0;
+  let velX=power*Math.cos(angle)/2;
+  let velY=power*Math.sin(angle)/2;
+  for(let t=0;t<80;t++){
+    velY-=0.5;
+    tempX+=velX+wind*0.05; // wind pushes horizontally
+    tempY+=velY;
+    if(tempY<0) break;
+    let dot=document.createElement("div");
+    dot.className="trajectory";
+    dot.style.left=tempX+"px";
+    dot.style.bottom=tempY+"px";
+    dot.style.background="rgba(0,0,0,0.4)";
+    dartContainer.appendChild(dot);
+    previewDots.push(dot);
+  }
+}
+
+function throwDart(power,angle){
+  let velX=power*Math.cos(angle)/2;
+  let velY=power*Math.sin(angle)/2;
   let dart=currentDart;
   let posX=194;
   let posY=0;
@@ -242,13 +253,15 @@ function scoreDart(x,y){
   if(dist<=20) points=50;
   else if(dist<=60) points=25;
   else if(dist<=120) points=10;
+
+  if(points>0) fireworks(x,y);
+
   players[currentPlayer].score+=points;
   renderScore();
-  if(points>0) fireworks(x,y);
 }
 
 function fireworks(x,y){
-  for(let i=0;i<30;i++){
+  for(let i=0;i<25;i++){
     let f=document.createElement("div");
     f.className="firework";
     f.style.left=x+"px";
@@ -264,20 +277,23 @@ function fireworks(x,y){
       speed*=0.95;
       f.style.left=left+"px";
       f.style.bottom=bottom+"px";
-      if(speed<0.1) { clearInterval(interval); f.remove(); }
+      if(speed<0.1){clearInterval(interval);f.remove();}
     },30);
   }
 }
 
-function nextTurn(){
-  index++;
-  currentPlayer=(currentPlayer+1)%players.length;
-  loadQuestion();
+function nextTurn(skip=false){
+  // 2s pause before next player/question
+  setTimeout(()=>{
+    index++;
+    currentPlayer=(currentPlayer+1)%players.length;
+    loadQuestion();
+  },2000);
 }
 
 function endGame(){
   let winner = players.reduce((a,b)=>a.score>b.score?a:b);
-  result.textContent = `Game Over! Winner: ${winner.name} 🎉`;
+  result.textContent = `🏁 Game Over! Winner: ${winner.name} 🎉`;
 }
 
 function drawDartboard(){
@@ -292,9 +308,8 @@ function drawDartboard(){
     r.style.opacity="0.8";
     dartContainer.appendChild(r);
 
-    // Score label
-    let label = document.createElement("div");
-    label.textContent = (rings[i]===20? "50 pts" : rings[i]===60? "25 pts" : "10 pts");
+    let label=document.createElement("div");
+    label.textContent=(rings[i]===20? "50 pts" : rings[i]===60? "25 pts" : "10 pts");
     label.style.position="absolute";
     label.style.left="50%";
     label.style.bottom=(200 + rings[i] - 10)+"px";
