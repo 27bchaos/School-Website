@@ -95,7 +95,7 @@ function startGame(){
   gameContainer.style.display="block";
   index=0; currentPlayer=0;
   renderScore();
-  drawDartboard();
+  hideDartboard();
   loadQuestion();
 }
 
@@ -118,19 +118,29 @@ function loadQuestion(){
   windInfo.textContent = `💨 Wind strength: ${wind.toFixed(1)} units`;
   throwsLeft = 3;
   canThrow = false;
-  dartContainer.innerHTML="";
-  drawDartboard();
+  hideDartboard();
 }
 
 function checkAnswer(i){
   if(i !== questions[index].c){
     alert("❌ Incorrect! You lose your turn.");
-    nextTurn(true); // skip to next
+    nextTurn(true);
   } else {
-    alert("✅ Correct! You get to throw darts!");
+    alert("✅ Correct! Get ready to throw!");
     canThrow = true;
+    showDartboard();
     prepareDart();
   }
+}
+
+function showDartboard(){
+  dartContainer.style.display = "block";
+  drawDartboard();
+}
+
+function hideDartboard(){
+  dartContainer.style.display = "none";
+  dartContainer.innerHTML = "";
 }
 
 function prepareDart(){
@@ -163,8 +173,8 @@ function setupHoldThrow(){
     isHolding=true;
     countdown=5;
     countdownText.textContent=`Holding... ${countdown}`;
-    let power = 100; // fixed power for simplicity
-    let angle = Math.PI/3; // 60° throw angle
+    let power = 100;
+    let angle = Math.PI/3;
     drawTrajectory(previewDots, power, angle);
 
     countdownInterval=setInterval(()=>{
@@ -194,19 +204,28 @@ function setupHoldThrow(){
 function drawTrajectory(previewDots, power, angle){
   previewDots.forEach(d=>d.remove());
   previewDots.length=0;
+
   let tempX=194, tempY=0;
   let velX=power*Math.cos(angle)/2;
   let velY=power*Math.sin(angle)/2;
+
   for(let t=0;t<80;t++){
     velY-=0.5;
-    tempX+=velX+wind*0.05; // wind pushes horizontally
+    tempX+=velX+wind*0.05;
     tempY+=velY;
     if(tempY<0) break;
+
+    // Determine color: closer to center (green), farther (red)
+    let centerX=200, centerY=200;
+    let dx=tempX-centerX, dy=tempY-centerY;
+    let dist=Math.sqrt(dx*dx+dy*dy);
+    let color = dist<=40 ? "limegreen" : dist<=100 ? "yellow" : "red";
+
     let dot=document.createElement("div");
     dot.className="trajectory";
     dot.style.left=tempX+"px";
     dot.style.bottom=tempY+"px";
-    dot.style.background="rgba(0,0,0,0.4)";
+    dot.style.background=color;
     dartContainer.appendChild(dot);
     previewDots.push(dot);
   }
@@ -232,6 +251,7 @@ function throwDart(power,angle){
       if(throwsLeft>0){
         prepareDart();
       } else {
+        hideDartboard();
         nextTurn();
       }
     }
@@ -283,7 +303,6 @@ function fireworks(x,y){
 }
 
 function nextTurn(skip=false){
-  // 2s pause before next player/question
   setTimeout(()=>{
     index++;
     currentPlayer=(currentPlayer+1)%players.length;
