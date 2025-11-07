@@ -58,15 +58,6 @@ const questions = [
   {q:"Congress is part of which branch?", a:["Judicial","Legislative","Executive"], c:1},
   {q:"The President leads which branch?", a:["Legislative","Executive","Judicial"], c:1},
   {q:"The Supreme Court is part of which branch?", a:["Executive","Judicial","Legislative"], c:1},
-  {q:"What is the main responsibility of the Legislative Branch?", a:["Enforce laws","Make laws","Interpret laws"], c:1},
-  {q:"Who helps the President run the Executive Branch?", a:["Congress","Cabinet","Supreme Court"], c:1},
-  {q:"Which branch can declare laws unconstitutional?", a:["Judicial","Legislative","Executive"], c:0},
-  {q:"Which branch approves the federal budget?", a:["Executive","Legislative","Judicial"], c:1},
-  {q:"Who can issue executive orders?", a:["Congress","President","Supreme Court"], c:1},
-  {q:"What does the Judicial Branch use to review laws?", a:["Judicial review","Impeachment","Treaties"], c:0},
-  {q:"Which branch conducts oversight investigations?", a:["Legislative","Judicial","Executive"], c:0},
-  {q:"Recognizing foreign nations is a duty of which branch?", a:["Executive","Legislative","Judicial"], c:0},
-  {q:"Who sentences offenders and establishes judicial procedures?", a:["Congress","Supreme Court","President"], c:1},
 ];
 
 let players = [];
@@ -75,13 +66,14 @@ let index = 0;
 let dartContainer = document.getElementById('dartContainer');
 let powerFill = document.getElementById('powerFill');
 let isDragging = false;
-let startX = 0;
-let startY = 0;
-let angle = 0;
-let power = 0;
+let startX = 0, startY = 0;
+let angle = 0, power = 0;
 let currentDart = null;
 let wind = 0;
 let throwsLeft = 3;
+let holdTimer = null;
+let countdownInterval = null;
+let countdown = 0;
 
 const qBox = document.getElementById('question');
 const ansBox = document.getElementById('answers');
@@ -124,20 +116,23 @@ function loadQuestion(){
     ansBox.appendChild(btn);
   });
   wind = (Math.random()-0.5)*20;
-  windInfo.textContent = `Wind: ${wind.toFixed(1)} units`;
+  windInfo.textContent = `💨 Wind: ${wind.toFixed(1)} units`;
   throwsLeft = 3;
   prepareDart();
 }
 
 function checkAnswer(i){
-  if(i === questions[index].c){
-    players[currentPlayer].score += 10;
+  // ✅ Only reward with dart throws, not score directly
+  if(i !== questions[index].c){
+    alert("Incorrect! You can still try to hit for points!");
+  } else {
+    alert("Correct! Now aim carefully!");
   }
-  renderScore();
 }
 
 function prepareDart(){
   dartContainer.innerHTML="";
+  drawDartboard();
   currentDart = document.createElement("div");
   currentDart.className="dart";
   currentDart.style.left="194px";
@@ -148,12 +143,36 @@ function prepareDart(){
 
 function setupDrag(){
   isDragging=false;
-  const trajectoryDots = [];
+  let countdownText = document.createElement("div");
+  countdownText.style.position="absolute";
+  countdownText.style.top="10px";
+  countdownText.style.left="50%";
+  countdownText.style.transform="translateX(-50%)";
+  countdownText.style.color="red";
+  countdownText.style.fontSize="22px";
+  countdownText.style.fontWeight="bold";
+  dartContainer.appendChild(countdownText);
+
   dartContainer.onmousedown=(e)=>{
     isDragging=true;
     startX=e.offsetX; startY=e.offsetY;
     power=0; powerFill.style.width="0%";
+    countdown=5;
+    countdownText.textContent = `Hold steady... ${countdown}`;
+    countdownInterval = setInterval(()=>{
+      countdown--;
+      countdownText.textContent = `Hold steady... ${countdown}`;
+      // Wind wobbles the mouse aim slightly
+      startX += wind * 0.1;
+      if(countdown<=0){
+        clearInterval(countdownInterval);
+        isDragging=false;
+        countdownText.textContent = "";
+        throwDart(angle,power);
+      }
+    },1000);
   };
+
   dartContainer.onmousemove=(e)=>{
     if(isDragging){
       let dx = e.offsetX - startX;
@@ -161,33 +180,15 @@ function setupDrag(){
       angle = Math.atan2(dy, dx);
       power = Math.min(Math.sqrt(dx*dx+dy*dy), 120);
       powerFill.style.width=power+"%";
-
-      trajectoryDots.forEach(d=>d.remove());
-      trajectoryDots.length=0;
-
-      let tempX=194,tempY=0;
-      let velX=power*Math.cos(angle)/2;
-      let velY=power*Math.sin(angle)/2;
-      for(let t=0;t<50;t++){
-        velY-=0.5;
-        tempX+=velX+wind*0.05;
-        tempY+=velY;
-        if(tempY<0) break;
-        let dot=document.createElement("div");
-        dot.className="trajectory";
-        dot.style.left=tempX+"px";
-        dot.style.bottom=tempY+"px";
-        dartContainer.appendChild(dot);
-        trajectoryDots.push(dot);
-      }
     }
   };
-  dartContainer.onmouseup=(e)=>{
+
+  dartContainer.onmouseup=()=>{
     if(isDragging){
       isDragging=false;
-      powerFill.style.width="0%";
-      trajectoryDots.forEach(d=>d.remove());
-      throwDart(angle,power);
+      clearInterval(countdownInterval);
+      countdownText.textContent = "Cancelled throw!";
+      setTimeout(()=>countdownText.remove(),1000);
     }
   };
 }
@@ -272,7 +273,6 @@ function endGame(){
 }
 
 function drawDartboard(){
-  dartContainer.innerHTML="";
   const rings=[120,"#ffd700",60,"#c0c0c0",20,"#ff4500"];
   for(let i=0;i<rings.length;i+=2){
     let r=document.createElement("div");
@@ -281,10 +281,19 @@ function drawDartboard(){
     r.style.left=(200-rings[i])+"px";
     r.style.bottom=(200-rings[i])+"px";
     r.style.background=rings[i+1];
+    r.style.opacity="0.8";
     dartContainer.appendChild(r);
+
+    // ✅ Add score labels on the rings
+    let label = document.createElement("div");
+    label.textContent = (rings[i]===20? "50 pts" : rings[i]===60? "25 pts" : "10 pts");
+    label.style.position="absolute";
+    label.style.left="50%";
+    label.style.bottom=(200 + rings[i] - 10)+"px";
+    label.style.transform="translateX(-50%)";
+    label.style.color="#1a3c6d";
+    label.style.fontWeight="bold";
+    dartContainer.appendChild(label);
   }
 }
 </script>
-
-</body>
-</html>
