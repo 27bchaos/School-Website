@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>US Gov Dart Challenge - Ultimate GamePigeon</title>
+<title>US Gov Dart Challeng</title>
 <style>
 body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; overflow-x:hidden;}
 h1{color:#1a3c6d; margin-top:20px;}
@@ -64,16 +64,13 @@ const questions = [
 let players = [];
 let currentPlayer = 0;
 let index = 0;
-let dartContainer = document.getElementById('dartContainer');
-let powerFill = document.getElementById('powerFill');
-let isHolding = false;
 let currentDart = null;
-let throwsLeft = 3;
-let countdownInterval = null;
-let countdown = 0;
 let canThrow = false;
-let angle = Math.PI / 3; // default angle
+let dragging = false;
+let startX, startY, endX, endY;
+let powerLine = null;
 
+const dartContainer = document.getElementById('dartContainer');
 const qBox = document.getElementById('question');
 const ansBox = document.getElementById('answers');
 const result = document.getElementById('result');
@@ -114,10 +111,8 @@ function loadQuestion(){
     btn.onclick = ()=>checkAnswer(i);
     ansBox.appendChild(btn);
   });
-  throwsLeft = 3;
-  canThrow = false;
+  windInfo.textContent = ""; // no wind
   hideDartboard();
-  windInfo.textContent = ""; // removed wind display
 }
 
 function checkAnswer(i){
@@ -151,119 +146,77 @@ function prepareDart(){
   currentDart.style.left="194px";
   currentDart.style.bottom="0px";
   dartContainer.appendChild(currentDart);
-  setupHoldThrow();
-  setupArrowControls();
+  setupDragThrow();
 }
 
-function setupArrowControls(){
-  document.onkeydown = (e)=>{
+function setupDragThrow(){
+  dartContainer.onmousedown = (e) => {
     if(!canThrow) return;
-    if(e.key === "ArrowLeft") angle += 0.1;
-    if(e.key === "ArrowRight") angle -= 0.1;
-    if(angle < 0.1) angle = 0.1;
-    if(angle > Math.PI/2) angle = Math.PI/2;
-  };
-}
+    dragging = true;
+    startX = e.offsetX;
+    startY = e.offsetY;
 
-function setupHoldThrow(){
-  let countdownText = document.createElement("div");
-  countdownText.style.position="absolute";
-  countdownText.style.top="10px";
-  countdownText.style.left="50%";
-  countdownText.style.transform="translateX(-50%)";
-  countdownText.style.color="red";
-  countdownText.style.fontSize="22px";
-  countdownText.style.fontWeight="bold";
-  dartContainer.appendChild(countdownText);
-
-  let previewDots = [];
-
-  dartContainer.onmousedown=()=>{
-    if(!canThrow || isHolding) return;
-    isHolding=true;
-    countdown=5;
-    countdownText.textContent=`Holding... ${countdown}`;
-    let power = 100;
-    drawTrajectory(previewDots, power, angle);
-
-    countdownInterval=setInterval(()=>{
-      countdown--;
-      countdownText.textContent=`Holding... ${countdown}`;
-      if(countdown<=0){
-        clearInterval(countdownInterval);
-        countdownText.textContent="";
-        isHolding=false;
-        previewDots.forEach(d=>d.remove());
-        throwDart(power,angle);
-      }
-    },1000);
-  };
-
-  dartContainer.onmouseup=()=>{
-    if(isHolding){
-      clearInterval(countdownInterval);
-      isHolding=false;
-      countdownText.textContent="Cancelled!";
-      setTimeout(()=>countdownText.remove(),1000);
-      previewDots.forEach(d=>d.remove());
+    if(!powerLine){
+      powerLine = document.createElement("div");
+      powerLine.style.position = "absolute";
+      powerLine.style.height = "4px";
+      powerLine.style.background = "limegreen";
+      powerLine.style.transformOrigin = "0% 50%";
+      powerLine.style.borderRadius = "2px";
+      dartContainer.appendChild(powerLine);
     }
   };
+
+  dartContainer.onmousemove = (e) => {
+    if(!dragging || !powerLine) return;
+    endX = e.offsetX;
+    endY = e.offsetY;
+    let dx = startX - endX;
+    let dy = startY - endY;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    let angle = Math.atan2(dy, dx);
+    powerLine.style.width = dist + "px";
+    powerLine.style.left = startX + "px";
+    powerLine.style.top = startY + "px";
+    powerLine.style.transform = `rotate(${angle}rad)`;
+  };
+
+  dartContainer.onmouseup = (e) => {
+    if(!dragging) return;
+    dragging = false;
+    endX = e.offsetX;
+    endY = e.offsetY;
+    if(powerLine){ powerLine.remove(); powerLine=null; }
+
+    let dx = startX - endX;
+    let dy = startY - endY;
+    throwDart(dx, dy);
+  };
 }
 
-function drawTrajectory(previewDots, power, angle){
-  previewDots.forEach(d=>d.remove());
-  previewDots.length=0;
+function throwDart(dx, dy){
+  let power = Math.min(Math.sqrt(dx*dx + dy*dy), 200);
+  let angle = Math.atan2(dy, dx);
+  let velX = (power/5) * Math.cos(angle);
+  let velY = (power/5) * Math.sin(angle);
+  let x = 194, y = 0;
 
-  let tempX=194, tempY=0;
-  let velX=power*Math.cos(angle)/2;
-  let velY=power*Math.sin(angle)/2;
+  let dart = currentDart;
+  canThrow = false;
 
-  for(let t=0;t<80;t++){
-    velY-=0.5;
-    tempX+=velX;
-    tempY+=velY;
-    if(tempY<0) break;
+  let interval = setInterval(()=>{
+    velY -= 0.4; // gravity
+    x += velX;
+    y += velY;
+    dart.style.left = x + "px";
+    dart.style.bottom = y + "px";
 
-    let centerX=200, centerY=200;
-    let dx=tempX-centerX, dy=tempY-centerY;
-    let dist=Math.sqrt(dx*dx+dy*dy);
-    let color = dist<=40 ? "limegreen" : dist<=100 ? "yellow" : "red";
-
-    let dot=document.createElement("div");
-    dot.className="trajectory";
-    dot.style.left=tempX+"px";
-    dot.style.bottom=tempY+"px";
-    dot.style.background=color;
-    dartContainer.appendChild(dot);
-    previewDots.push(dot);
-  }
-}
-
-function throwDart(power,angle){
-  let velX=power*Math.cos(angle)/2;
-  let velY=power*Math.sin(angle)/2;
-  let dart=currentDart;
-  let posX=194;
-  let posY=0;
-  let interval=setInterval(()=>{
-    velY-=0.5;
-    posX+=velX;
-    posY+=velY;
-    dart.style.left=posX+"px";
-    dart.style.bottom=posY+"px";
-    if(posY<=0){
-      posY=0;
+    if(y <= 0){
       clearInterval(interval);
-      stickDart(posX,posY);
-      throwsLeft--;
-      if(throwsLeft>0){
-        prepareDart();
-      } else {
-        hideDartboard();
-        nextTurn();
-      }
+      stickDart(x, y);
+      setTimeout(()=>nextTurn(), 1500);
     }
-  },20);
+  }, 20);
 }
 
 function stickDart(x,y){
