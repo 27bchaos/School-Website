@@ -170,9 +170,9 @@ function startCupGame(){
     }
   }
 
-  // Drop balls: number = correctAnswers * 2, min 10
+
   let ballCount = 0;
-  const totalBalls = correctAnswers * 2 || 10;
+  const totalBalls = Math.min(Math.round(correctAnswers * 3.33), 50) || 10;
   const ballInterval = setInterval(()=>{
     dropBallCup();
     ballCount++;
