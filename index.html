@@ -41,6 +41,7 @@ button:hover{background:#345b8c;}
 </div>
 
 <script>
+// === QUESTIONS ===
 const questions = [
   {q:"Which branch of government makes the laws?", a:["Legislative","Executive","Judicial"], c:0},
   {q:"Which branch enforces the laws?", a:["Legislative","Executive","Judicial"], c:1},
@@ -62,7 +63,8 @@ const questions = [
 let players = [];
 let currentPlayer = 0;
 let index = 0;
-let correctAnswers = 0; // track correct
+let correctAnswers = 0; // quiz correct answers
+let cupPoints = 0;      // cup points during Cup Game
 let cup;
 let balls = [];
 let pegs = [];
@@ -76,6 +78,7 @@ const scoreBoard = document.getElementById('scoreBoard');
 const cupContainer = document.getElementById('cupContainer');
 const startCupBtn = document.getElementById('startCupBtn');
 
+// === START GAME ===
 function startSingle(){ players = [{name:"Player 1", score:0}]; startGame(); }
 function startMulti(){
   const p1 = prompt("Enter Player 1 Name:","Player 1");
@@ -95,7 +98,11 @@ function startGame(){
 }
 
 function renderScore(){
-  scoreBoard.textContent = `Correct Answers: ${correctAnswers}`;
+  if(cup){ // during Cup Game
+    scoreBoard.textContent = `Cup Points: ${cupPoints}`;
+  } else { // during quiz
+    scoreBoard.textContent = `Correct Answers: ${correctAnswers}`;
+  }
 }
 
 function loadQuestion(){
@@ -140,14 +147,13 @@ function startCupGame(){
   cupContainer.innerHTML = "";
   balls = [];
   pegs = [];
-
-  // Cup
+  cupPoints = 0; // reset cup points
   cup = document.createElement("div");
   cup.className = "cup";
   cup.style.left = "260px";
   cup.style.background = "red";
-  cup.dataset.points = 10;
-  cup.textContent = 10;
+  cup.dataset.points = 0;
+  cup.textContent = 0;
   cupContainer.appendChild(cup);
 
   // Pegs
@@ -164,7 +170,7 @@ function startCupGame(){
     }
   }
 
-  // Drop balls: number = correctAnswers * 2
+  // Drop balls: number = correctAnswers * 2, min 10
   let ballCount = 0;
   const totalBalls = correctAnswers * 2 || 10;
   const ballInterval = setInterval(()=>{
@@ -207,7 +213,8 @@ function dropBallCup(){
 
     const cupLeft = parseFloat(cup.style.left);
     if(bottom<=70 && left+10>cupLeft && left<cupLeft+80){
-      cup.dataset.points = parseInt(cup.dataset.points)+10;
+      cupPoints += 10;
+      cup.textContent = cupPoints;
       ball.remove();
       clearInterval(interval);
       renderScore();
