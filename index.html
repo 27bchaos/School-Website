@@ -187,6 +187,6 @@ function startCupDrop(){
 // === END GAME ===
 function endGame(){
   let winner = players.reduce((a,b)=>a.score>b.score?a:b);
-  result.textContent = `🏁 Game Over! Winner: ${winner.name} 🎉`;
+  result.textContent = ` Game Over! Winner is: ${winner.name}`;
 }
 </script>
