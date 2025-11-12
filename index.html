@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>US Gov Cup Drop Quiz</title>
+<title>US Gov Cup Drop Quiz Enhanced</title>
 <style>
 body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; overflow-x:hidden;}
 h1{color:#1a3c6d; margin-top:20px;}
@@ -15,11 +15,12 @@ button:hover{background:#345b8c;}
 #cupContainer{position:relative; width:600px; height:400px; margin:30px auto; background:#d0f0f0; border:2px solid #1a3c6d; border-radius:10px; overflow:hidden;}
 .cup{position:absolute; bottom:0; width:80px; height:60px; border-radius:10px; text-align:center; color:white; font-weight:bold; line-height:60px;}
 .ball{position:absolute; width:10px; height:10px; border-radius:50%; background:black;}
+.peg{position:absolute; width:10px; height:10px; border-radius:50%; background:#1a3c6d;}
 </style>
 </head>
 <body>
 
-<h1>🎯 US Gov Cup Drop</h1>
+<h1>🎯 US Gov Cup Drop Quiz Enhanced</h1>
 
 <div id="playerSelect">
   <h3>Select Mode:</h3>
@@ -31,6 +32,7 @@ button:hover{background:#345b8c;}
   <div id="questionBox">
     <h2 id="question"></h2>
     <div id="answers"></div>
+    <p id="timer"></p>
   </div>
 
   <div id="scoreBoard"></div>
@@ -38,6 +40,7 @@ button:hover{background:#345b8c;}
   <div id="cupContainer"></div>
 
   <h2 id="result"></h2>
+  <button id="replayBtn" style="display:none;" onclick="restartGame()">Play Again</button>
 </div>
 
 <script>
@@ -55,6 +58,8 @@ let players = [];
 let currentPlayer = 0;
 let index = 0;
 let earnedCups = 0;
+let questionTimer;
+const maxTime = 15; // seconds
 
 const qBox = document.getElementById('question');
 const ansBox = document.getElementById('answers');
@@ -63,6 +68,8 @@ const gameContainer = document.getElementById('gameContainer');
 const playerSelect = document.getElementById('playerSelect');
 const scoreBoard = document.getElementById('scoreBoard');
 const cupContainer = document.getElementById('cupContainer');
+const timerDisplay = document.getElementById('timer');
+const replayBtn = document.getElementById('replayBtn');
 
 // === START GAME ===
 function startSingle() { players = [{name:"Player 1", score:0}]; startGame(); }
@@ -79,6 +86,19 @@ function startGame(){
   index=0; currentPlayer=0;
   earnedCups=0;
   renderScore();
+  replayBtn.style.display="none";
+  loadQuestion();
+}
+
+function restartGame(){
+  players.forEach(p=>p.score=0);
+  index=0;
+  currentPlayer=0;
+  earnedCups=0;
+  result.textContent="";
+  cupContainer.innerHTML="";
+  replayBtn.style.display="none";
+  renderScore();
   loadQuestion();
 }
 
@@ -89,28 +109,43 @@ function renderScore(){
 // === LOAD QUESTIONS ===
 function loadQuestion(){
   if(index >= questions.length){
-    // all questions done → drop balls
     startCupDrop();
     return;
   }
   const q = questions[index];
   qBox.textContent = `${players[currentPlayer].name}'s turn: ${q.q}`;
   ansBox.innerHTML = "";
+  timerDisplay.textContent = `Time Left: ${maxTime}s`;
+  let timeLeft = maxTime;
+
+  questionTimer = setInterval(()=>{
+    timeLeft--;
+    timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+    if(timeLeft<=0){
+      clearInterval(questionTimer);
+      alert("⏰ Time's up! No cup earned.");
+      nextQuestion();
+    }
+  },1000);
+
   q.a.forEach((opt,i)=>{
     let btn = document.createElement("button");
     btn.textContent = opt;
-    btn.onclick = ()=>checkAnswer(i);
+    btn.onclick = ()=>{
+      clearInterval(questionTimer);
+      if(i === q.c){
+        alert("✅ Correct! You earned a cup!");
+        earnedCups++;
+      } else {
+        alert("❌ Incorrect! No cup earned.");
+      }
+      nextQuestion();
+    };
     ansBox.appendChild(btn);
   });
 }
 
-function checkAnswer(i){
-  if(i !== questions[index].c){
-    alert("❌ Incorrect! No cup earned.");
-  } else {
-    alert("✅ Correct! You earned a cup!");
-    earnedCups++;
-  }
+function nextQuestion(){
   index++;
   currentPlayer = (currentPlayer+1)%players.length;
   loadQuestion();
@@ -120,12 +155,17 @@ function checkAnswer(i){
 function startCupDrop(){
   qBox.textContent = "🎉 Balls are dropping!";
   ansBox.innerHTML = "";
+  timerDisplay.textContent = "";
 
   cupContainer.innerHTML = "";
+
+  // Cup colors with points and multipliers
   const cupColors = [
     {color:"red", points:10},
     {color:"green", points:25},
-    {color:"gold", points:50}
+    {color:"gold", points:50},
+    {color:"blue", points:100},
+    {color:"purple", points:200}
   ];
 
   const cupCount = earnedCups;
@@ -136,14 +176,30 @@ function startCupDrop(){
     const cup = document.createElement("div");
     cup.className="cup";
     cup.style.left = (cupSpacing*(i+1)-40)+"px";
-    cup.style.background = cupColors[i%cupColors.length].color;
-    cup.dataset.points = cupColors[i%cupColors.length].points;
-    cup.textContent = cup.dataset.points;
+    const c = cupColors[i % cupColors.length];
+    cup.style.background = c.color;
+    cup.dataset.points = c.points;
+    cup.textContent = `${c.points}`;
     cupContainer.appendChild(cup);
     cups.push(cup);
   }
 
-  // DROP 100 BALLS
+  // Add pegs for bouncing
+  const pegs = [];
+  for(let row=1; row<7; row++){
+    for(let col=0; col<7; col++){
+      const peg = document.createElement("div");
+      peg.className="peg";
+      let x = col*90 + (row%2)*45 + 30;
+      let y = 400 - row*50;
+      peg.style.left = x+"px";
+      peg.style.bottom = y+"px";
+      cupContainer.appendChild(peg);
+      pegs.push(peg);
+    }
+  }
+
+  // Drop 100 balls
   const balls = [];
   for(let i=0;i<100;i++){
     const ball = document.createElement("div");
@@ -154,39 +210,84 @@ function startCupDrop(){
     balls.push(ball);
   }
 
-  // Animate balls falling
+  // Animate balls with basic bouncing physics
   let landed = 0;
   balls.forEach(ball=>{
-    let vy = -Math.random()*2-2; // random initial speed
+    let vx = (Math.random()-0.5)*2; // horizontal velocity
+    let vy = -2; // initial downward
     let interval = setInterval(()=>{
       let bottom = parseFloat(ball.style.bottom);
-      bottom += vy;
+      let left = parseFloat(ball.style.left);
+
+      // simple collision with pegs
+      pegs.forEach(peg=>{
+        const px = parseFloat(peg.style.left);
+        const py = parseFloat(peg.style.bottom);
+        if(Math.abs(px-left)<10 && Math.abs(py-bottom)<10){
+          vx += (Math.random()-0.5)*1;
+          vy = 2; // bounce up
+        }
+      });
+
       vy -= 0.1; // gravity
+      left += vx;
+      bottom += vy;
+
+      // bounce off walls
+      if(left<0){ left=0; vx*=-1; }
+      if(left>590){ left=590; vx*=-1; }
+
+      // land in cups
       if(bottom <= 0){
-        bottom = 0;
+        bottom=0;
         clearInterval(interval);
-        // check which cup it landed in
         cups.forEach(cup=>{
           const cupLeft = parseFloat(cup.style.left);
-          if(parseFloat(ball.style.left) > cupLeft && parseFloat(ball.style.left) < cupLeft + 80){
+          if(left > cupLeft && left < cupLeft + 80){
             players[currentPlayer].score += parseInt(cup.dataset.points);
             renderScore();
+            // firework effect
+            for(let f=0; f<10; f++){
+              const fw = document.createElement("div");
+              fw.className="ball";
+              fw.style.width="6px";
+              fw.style.height="6px";
+              fw.style.background="yellow";
+              fw.style.left = left+"px";
+              fw.style.bottom = bottom+"px";
+              cupContainer.appendChild(fw);
+              let angle = Math.random()*2*Math.PI;
+              let speed = Math.random()*2+1;
+              let fwInterval = setInterval(()=>{
+                let fwLeft = parseFloat(fw.style.left);
+                let fwBottom = parseFloat(fw.style.bottom);
+                fwLeft += Math.cos(angle)*speed;
+                fwBottom += Math.sin(angle)*speed;
+                speed *= 0.9;
+                fw.style.left = fwLeft+"px";
+                fw.style.bottom = fwBottom+"px";
+                if(speed<0.1){ clearInterval(fwInterval); fw.remove(); }
+              },30);
+            }
           }
         });
         ball.remove();
         landed++;
-        if(landed === balls.length){
+        if(landed===balls.length){
           endGame();
         }
       }
+
+      ball.style.left = left+"px";
       ball.style.bottom = bottom+"px";
-    }, 20);
+    },20);
   });
 }
 
 // === END GAME ===
 function endGame(){
   let winner = players.reduce((a,b)=>a.score>b.score?a:b);
-  result.textContent = ` Game Over! Winner is: ${winner.name}`;
+  result.textContent = `🏁 Game Over! Winner: ${winner.name} 🎉`;
+  replayBtn.style.display="inline-block";
 }
 </script>
