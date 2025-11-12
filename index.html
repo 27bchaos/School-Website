@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>US Gov Dart Challeng</title>
+<title>US Gov Cup Drop Quiz</title>
 <style>
 body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; overflow-x:hidden;}
 h1{color:#1a3c6d; margin-top:20px;}
@@ -11,19 +11,15 @@ button:hover{background:#345b8c;}
 #playerSelect, #gameContainer{margin-top:20px;}
 #questionBox{background:#fff;padding:20px;margin:0 auto;width:60%;border-radius:10px;box-shadow:0 0 10px #aaa;}
 #answers button{display:block;width:200px;margin:5px auto;}
-#dartContainer{position:relative; margin:30px auto; width:400px; height:400px; border-radius:50%; overflow:hidden; background:#eee; border:5px solid #1a3c6d;}
-.dart{width:12px;height:12px;background:black;position:absolute;border-radius:50%; z-index:2;}
-#powerBar{height:20px;width:200px;background:lightgray;border-radius:5px;margin:10px auto;overflow:hidden;}
-.power{height:100%;width:0%;background:limegreen;}
 #scoreBoard{margin-top:20px;font-size:18px;color:#1a3c6d;}
-.trajectory{position:absolute;width:6px;height:6px;background:rgba(0,0,0,0.3);border-radius:50%;z-index:1;}
-.firework{position:absolute;width:4px;height:4px;background:yellow;border-radius:50%;z-index:3;}
-.ring{position:absolute;border-radius:50%;pointer-events:none;}
+#cupContainer{position:relative; width:600px; height:400px; margin:30px auto; background:#d0f0f0; border:2px solid #1a3c6d; border-radius:10px; overflow:hidden;}
+.cup{position:absolute; bottom:0; width:80px; height:60px; border-radius:10px; text-align:center; color:white; font-weight:bold; line-height:60px;}
+.ball{position:absolute; width:10px; height:10px; border-radius:50%; background:black;}
 </style>
 </head>
 <body>
 
-<h1>🎯 US Gov Dart Challenge</h1>
+<h1>🎯 US Gov Cup Drop</h1>
 
 <div id="playerSelect">
   <h3>Select Mode:</h3>
@@ -39,19 +35,13 @@ button:hover{background:#345b8c;}
 
   <div id="scoreBoard"></div>
 
-  <div id="dartContainer"></div>
-
-  <div id="controls">
-    <h3>Drag to set power & angle, release to throw!</h3>
-    <div id="powerBar"><div class="power" id="powerFill"></div></div>
-    <p id="windInfo"></p>
-  </div>
+  <div id="cupContainer"></div>
 
   <h2 id="result"></h2>
 </div>
 
-
 <script>
+// === QUESTIONS ===
 const questions = [
   {q:"Which branch of government makes the laws?", a:["Legislative","Executive","Judicial"], c:0},
   {q:"Which branch enforces the laws?", a:["Legislative","Executive","Judicial"], c:1},
@@ -64,21 +54,17 @@ const questions = [
 let players = [];
 let currentPlayer = 0;
 let index = 0;
-let currentDart = null;
-let canThrow = false;
-let dragging = false;
-let startX, startY, endX, endY;
-let powerLine = null;
+let earnedCups = 0;
 
-const dartContainer = document.getElementById('dartContainer');
 const qBox = document.getElementById('question');
 const ansBox = document.getElementById('answers');
 const result = document.getElementById('result');
 const gameContainer = document.getElementById('gameContainer');
 const playerSelect = document.getElementById('playerSelect');
 const scoreBoard = document.getElementById('scoreBoard');
-const windInfo = document.getElementById('windInfo');
+const cupContainer = document.getElementById('cupContainer');
 
+// === START GAME ===
 function startSingle() { players = [{name:"Player 1", score:0}]; startGame(); }
 function startMulti() {
   const p1 = prompt("Enter Player 1 Name:", "Player 1");
@@ -91,8 +77,8 @@ function startGame(){
   playerSelect.style.display="none";
   gameContainer.style.display="block";
   index=0; currentPlayer=0;
+  earnedCups=0;
   renderScore();
-  hideDartboard();
   loadQuestion();
 }
 
@@ -100,8 +86,13 @@ function renderScore(){
   scoreBoard.innerHTML = players.map(p=>`${p.name}: ${p.score}`).join(" | ");
 }
 
+// === LOAD QUESTIONS ===
 function loadQuestion(){
-  if(index >= questions.length){ endGame(); return; }
+  if(index >= questions.length){
+    // all questions done → drop balls
+    startCupDrop();
+    return;
+  }
   const q = questions[index];
   qBox.textContent = `${players[currentPlayer].name}'s turn: ${q.q}`;
   ansBox.innerHTML = "";
@@ -111,192 +102,91 @@ function loadQuestion(){
     btn.onclick = ()=>checkAnswer(i);
     ansBox.appendChild(btn);
   });
-  windInfo.textContent = ""; // no wind
-  hideDartboard();
 }
 
 function checkAnswer(i){
   if(i !== questions[index].c){
-    alert("❌ Incorrect! You lose your turn.");
-    nextTurn(true);
+    alert("❌ Incorrect! No cup earned.");
   } else {
-    alert("✅ Correct! Get ready to throw!");
-    canThrow = true;
-    showDartboard();
-    prepareDart();
+    alert("✅ Correct! You earned a cup!");
+    earnedCups++;
   }
+  index++;
+  currentPlayer = (currentPlayer+1)%players.length;
+  loadQuestion();
 }
 
-function showDartboard(){
-  dartContainer.style.display = "block";
-  drawDartboard();
-}
+// === CUP DROP ===
+function startCupDrop(){
+  qBox.textContent = "🎉 Balls are dropping!";
+  ansBox.innerHTML = "";
 
-function hideDartboard(){
-  dartContainer.style.display = "none";
-  dartContainer.innerHTML = "";
-}
+  cupContainer.innerHTML = "";
+  const cupColors = [
+    {color:"red", points:10},
+    {color:"green", points:25},
+    {color:"gold", points:50}
+  ];
 
-function prepareDart(){
-  if(!canThrow) return;
-  dartContainer.innerHTML="";
-  drawDartboard();
-  currentDart = document.createElement("div");
-  currentDart.className="dart";
-  currentDart.style.left="194px";
-  currentDart.style.bottom="0px";
-  dartContainer.appendChild(currentDart);
-  setupDragThrow();
-}
+  const cupCount = earnedCups;
+  const cupSpacing = 600 / (cupCount+1);
 
-function setupDragThrow(){
-  dartContainer.onmousedown = (e) => {
-    if(!canThrow) return;
-    dragging = true;
-    startX = e.offsetX;
-    startY = e.offsetY;
-
-    if(!powerLine){
-      powerLine = document.createElement("div");
-      powerLine.style.position = "absolute";
-      powerLine.style.height = "4px";
-      powerLine.style.background = "limegreen";
-      powerLine.style.transformOrigin = "0% 50%";
-      powerLine.style.borderRadius = "2px";
-      dartContainer.appendChild(powerLine);
-    }
-  };
-
-  dartContainer.onmousemove = (e) => {
-    if(!dragging || !powerLine) return;
-    endX = e.offsetX;
-    endY = e.offsetY;
-    let dx = startX - endX;
-    let dy = startY - endY;
-    let dist = Math.sqrt(dx*dx + dy*dy);
-    let angle = Math.atan2(dy, dx);
-    powerLine.style.width = dist + "px";
-    powerLine.style.left = startX + "px";
-    powerLine.style.top = startY + "px";
-    powerLine.style.transform = `rotate(${angle}rad)`;
-  };
-
-  dartContainer.onmouseup = (e) => {
-    if(!dragging) return;
-    dragging = false;
-    endX = e.offsetX;
-    endY = e.offsetY;
-    if(powerLine){ powerLine.remove(); powerLine=null; }
-
-    let dx = startX - endX;
-    let dy = startY - endY;
-    throwDart(dx, dy);
-  };
-}
-
-function throwDart(dx, dy){
-  let power = Math.min(Math.sqrt(dx*dx + dy*dy), 200);
-  let angle = Math.atan2(dy, dx);
-  let velX = (power/5) * Math.cos(angle);
-  let velY = (power/5) * Math.sin(angle);
-  let x = 194, y = 0;
-
-  let dart = currentDart;
-  canThrow = false;
-
-  let interval = setInterval(()=>{
-    velY -= 0.4; // gravity
-    x += velX;
-    y += velY;
-    dart.style.left = x + "px";
-    dart.style.bottom = y + "px";
-
-    if(y <= 0){
-      clearInterval(interval);
-      stickDart(x, y);
-      setTimeout(()=>nextTurn(), 1500);
-    }
-  }, 20);
-}
-
-function stickDart(x,y){
-  currentDart.style.left=x+"px";
-  currentDart.style.bottom=y+"px";
-  scoreDart(x,y);
-}
-
-function scoreDart(x,y){
-  let centerX=200,centerY=200;
-  let dx=x-centerX;
-  let dy=y-centerY;
-  let dist=Math.sqrt(dx*dx+dy*dy);
-  let points=0;
-  if(dist<=20) points=50;
-  else if(dist<=60) points=25;
-  else if(dist<=120) points=10;
-
-  if(points>0) fireworks(x,y);
-
-  players[currentPlayer].score+=points;
-  renderScore();
-}
-
-function fireworks(x,y){
-  for(let i=0;i<25;i++){
-    let f=document.createElement("div");
-    f.className="firework";
-    f.style.left=x+"px";
-    f.style.bottom=y+"px";
-    dartContainer.appendChild(f);
-    let a=Math.random()*2*Math.PI;
-    let s=Math.random()*5+2;
-    let interval=setInterval(()=>{
-      let left=parseFloat(f.style.left);
-      let bottom=parseFloat(f.style.bottom);
-      left+=Math.cos(a)*s;
-      bottom+=Math.sin(a)*s;
-      s*=0.95;
-      f.style.left=left+"px";
-      f.style.bottom=bottom+"px";
-      if(s<0.1){clearInterval(interval);f.remove();}
-    },30);
+  let cups = [];
+  for(let i=0;i<cupCount;i++){
+    const cup = document.createElement("div");
+    cup.className="cup";
+    cup.style.left = (cupSpacing*(i+1)-40)+"px";
+    cup.style.background = cupColors[i%cupColors.length].color;
+    cup.dataset.points = cupColors[i%cupColors.length].points;
+    cup.textContent = cup.dataset.points;
+    cupContainer.appendChild(cup);
+    cups.push(cup);
   }
+
+  // DROP 100 BALLS
+  const balls = [];
+  for(let i=0;i<100;i++){
+    const ball = document.createElement("div");
+    ball.className="ball";
+    ball.style.left = (Math.random()*580)+"px";
+    ball.style.bottom = "380px";
+    cupContainer.appendChild(ball);
+    balls.push(ball);
+  }
+
+  // Animate balls falling
+  let landed = 0;
+  balls.forEach(ball=>{
+    let vy = -Math.random()*2-2; // random initial speed
+    let interval = setInterval(()=>{
+      let bottom = parseFloat(ball.style.bottom);
+      bottom += vy;
+      vy -= 0.1; // gravity
+      if(bottom <= 0){
+        bottom = 0;
+        clearInterval(interval);
+        // check which cup it landed in
+        cups.forEach(cup=>{
+          const cupLeft = parseFloat(cup.style.left);
+          if(parseFloat(ball.style.left) > cupLeft && parseFloat(ball.style.left) < cupLeft + 80){
+            players[currentPlayer].score += parseInt(cup.dataset.points);
+            renderScore();
+          }
+        });
+        ball.remove();
+        landed++;
+        if(landed === balls.length){
+          endGame();
+        }
+      }
+      ball.style.bottom = bottom+"px";
+    }, 20);
+  });
 }
 
-function nextTurn(){
-  setTimeout(()=>{
-    index++;
-    currentPlayer=(currentPlayer+1)%players.length;
-    loadQuestion();
-  },2000);
-}
-
+// === END GAME ===
 function endGame(){
   let winner = players.reduce((a,b)=>a.score>b.score?a:b);
   result.textContent = `🏁 Game Over! Winner: ${winner.name} 🎉`;
-}
-
-function drawDartboard(){
-  const rings=[120,"#ffd700",60,"#c0c0c0",20,"#ff4500"];
-  for(let i=0;i<rings.length;i+=2){
-    let r=document.createElement("div");
-    r.className="ring";
-    r.style.width=r.style.height=(rings[i]*2)+"px";
-    r.style.left=(200-rings[i])+"px";
-    r.style.bottom=(200-rings[i])+"px";
-    r.style.background=rings[i+1];
-    r.style.opacity="0.8";
-    dartContainer.appendChild(r);
-
-    let label=document.createElement("div");
-    label.textContent=(rings[i]===20? "50 pts" : rings[i]===60? "25 pts" : "10 pts");
-    label.style.position="absolute";
-    label.style.left="50%";
-    label.style.bottom=(200 + rings[i] - 10)+"px";
-    label.style.transform="translateX(-50%)";
-    label.style.color="#1a3c6d";
-    label.style.fontWeight="bold";
-    dartContainer.appendChild(label);
-  }
 }
 </script>
