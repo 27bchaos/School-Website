@@ -2,91 +2,213 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>US Gov Cup Catch Quiz</title>
+<title>US Gov Cup Drop Quiz</title>
 <style>
-body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; overflow:hidden;}
+body { font-family: sans-serif; background:#e3eefc; text-align:center; margin:0; overflow-x:hidden;}
 h1{color:#1a3c6d; margin-top:20px;}
 button{margin:5px;padding:10px 18px;border:none;border-radius:6px;background:#1a3c6d;color:white;cursor:pointer;font-size:16px;}
 button:hover{background:#345b8c;}
-#gameContainer{margin-top:20px;}
+#playerSelect, #gameContainer{margin-top:20px;}
+#questionBox{background:#fff;padding:20px;margin:0 auto;width:60%;border-radius:10px;box-shadow:0 0 10px #aaa;}
+#answers button{display:block;width:200px;margin:5px auto;}
+#scoreBoard{margin-top:20px;font-size:18px;color:#1a3c6d;}
 #cupContainer{position:relative; width:600px; height:400px; margin:30px auto; background:#d0f0f0; border:2px solid #1a3c6d; border-radius:10px; overflow:hidden;}
 .cup{position:absolute; bottom:10px; width:80px; height:60px; border-radius:10px; text-align:center; color:white; font-weight:bold; line-height:60px; font-size:16px;}
 .ball{position:absolute; width:10px; height:10px; border-radius:50%; background:black;}
-#scoreBoard{font-size:18px; color:#1a3c6d;}
-#timerDisplay{font-size:18px; color:#1a3c6d; margin-top:10px;}
+.peg{position:absolute; width:10px; height:10px; border-radius:50%; background:#1a3c6d;}
 </style>
 </head>
 <body>
 
-<h1>🎯 US Gov Cup Catch Game</h1>
+<h1>🎯 US Gov Cup Drop Quiz</h1>
 
-<div id="gameContainer">
-  <div id="scoreBoard">Score: 0</div>
-  <div id="timerDisplay">Time: 30s</div>
+<div id="playerSelect">
+  <h3>Select Mode:</h3>
+  <button onclick="startSingle()">Single Player</button>
+  <button onclick="startMulti()">Multiplayer</button>
+</div>
+
+<div id="gameContainer" style="display:none;">
+  <div id="questionBox">
+    <h2 id="question"></h2>
+    <div id="answers"></div>
+  </div>
+
+  <div id="scoreBoard"></div>
   <div id="cupContainer"></div>
   <h2 id="result"></h2>
-  <button id="startBtn">Start Game</button>
 </div>
 
 <script>
-const cupContainer = document.getElementById('cupContainer');
-const scoreBoard = document.getElementById('scoreBoard');
-const timerDisplay = document.getElementById('timerDisplay');
+// === QUESTIONS ===
+const questions = [
+  {q:"Which branch of government makes the laws?", a:["Legislative","Executive","Judicial"], c:0},
+  {q:"Which branch enforces the laws?", a:["Legislative","Executive","Judicial"], c:1},
+  {q:"Which branch interprets the laws?", a:["Judicial","Executive","Legislative"], c:0},
+  {q:"Congress is part of which branch?", a:["Judicial","Legislative","Executive"], c:1},
+  {q:"The President leads which branch?", a:["Legislative","Executive","Judicial"], c:1},
+  {q:"The Supreme Court is part of which branch?", a:["Executive","Judicial","Legislative"], c:1},
+];
+
+let players = [];
+let currentPlayer = 0;
+let index = 0;
+let cup;
+let score = 0;
+let balls = [];
+let pegs = [];
+
+// DOM elements
+const qBox = document.getElementById('question');
+const ansBox = document.getElementById('answers');
 const result = document.getElementById('result');
-const startBtn = document.getElementById('startBtn');
+const gameContainer = document.getElementById('gameContainer');
+const playerSelect = document.getElementById('playerSelect');
+const scoreBoard = document.getElementById('scoreBoard');
+const cupContainer = document.getElementById('cupContainer');
 
-let cup, score=0, gameInterval, timeLeft=30, ballInterval;
-
-// === CREATE MOVABLE CUP ===
-function createCup(){
-  cup = document.createElement('div');
-  cup.className='cup';
-  cup.style.left = '260px'; // center start
-  cup.style.background = 'red';
-  cup.textContent = '10';
-  cup.dataset.points = 10;
-  cupContainer.appendChild(cup);
+// === START GAME ===
+function startSingle(){ players = [{name:"Player 1", score:0}]; startGame(); }
+function startMulti(){
+  const p1 = prompt("Enter Player 1 Name:","Player 1");
+  const p2 = prompt("Enter Player 2 Name:","Player 2");
+  players = [{name:p1||"Player 1",score:0},{name:p2||"Player 2",score:0}];
+  startGame();
 }
 
-// === CUP CONTROL ===
-document.addEventListener('keydown', (e)=>{
-  if(!cup) return;
-  let left = parseFloat(cup.style.left);
-  if(e.key==='ArrowLeft') left -= 20;
-  if(e.key==='ArrowRight') left += 20;
-  if(left<0) left=0;
-  if(left>520) left=520; // container width - cup width
-  cup.style.left = left+'px';
-});
+function startGame(){
+  playerSelect.style.display="none";
+  gameContainer.style.display="block";
+  index=0;
+  currentPlayer=0;
+  score=0;
+  renderScore();
+  loadQuestion();
+}
 
-// === DROP BALL ===
-function dropBall(){
-  const ball = document.createElement('div');
-  ball.className='ball';
-  ball.style.left = (Math.random()*590)+'px';
-  ball.style.bottom = '380px';
+function renderScore(){
+  scoreBoard.textContent = players.map(p=>`${p.name}: ${p.score}`).join(" | ");
+}
+
+// === LOAD QUESTIONS ===
+function loadQuestion(){
+  if(index >= questions.length){
+    result.textContent = `🏁 Game Over! Final Score: ${score}`;
+    return;
+  }
+  const q = questions[index];
+  qBox.textContent = `${players[currentPlayer].name}'s turn: ${q.q}`;
+  ansBox.innerHTML = "";
+
+  q.a.forEach((opt,i)=>{
+    const btn = document.createElement("button");
+    btn.textContent = opt;
+    btn.onclick = ()=>{
+      if(i === q.c){
+        alert("✅ Correct! Cup will appear!");
+        spawnCupRound(players[currentPlayer]);
+      } else {
+        alert("❌ Incorrect! Next question.");
+        nextQuestion();
+      }
+    };
+    ansBox.appendChild(btn);
+  });
+}
+
+// === NEXT QUESTION ===
+function nextQuestion(){
+  index++;
+  currentPlayer = (currentPlayer+1)%players.length;
+  loadQuestion();
+}
+
+// === SPAWN CUP + BALL ROUND ===
+function spawnCupRound(player){
+  cupContainer.innerHTML = "";
+  balls = [];
+  pegs = [];
+
+  // Cup colors and points
+  const cupOptions = [
+    {color:"red", points:10},
+    {color:"green", points:25},
+    {color:"blue", points:50},
+    {color:"gold", points:100}
+  ];
+  const c = cupOptions[Math.floor(Math.random()*cupOptions.length)];
+
+  cup = document.createElement("div");
+  cup.className = "cup";
+  cup.style.left = "260px"; // center
+  cup.style.background = c.color;
+  cup.dataset.points = c.points;
+  cup.textContent = c.points;
+  cupContainer.appendChild(cup);
+
+  // Add obstacles (pegs)
+  for(let row=1; row<7; row++){
+    for(let col=0; col<7; col++){
+      const peg = document.createElement("div");
+      peg.className="peg";
+      let x = col*90 + (row%2)*45 + 30;
+      let y = 400 - row*50;
+      peg.style.left = x+"px";
+      peg.style.bottom = y+"px";
+      cupContainer.appendChild(peg);
+      pegs.push(peg);
+    }
+  }
+
+  // Drop 30 balls, 1 per second
+  let ballCount = 0;
+  const ballInterval = setInterval(()=>{
+    dropBall(player);
+    ballCount++;
+    if(ballCount>=30){
+      clearInterval(ballInterval);
+    }
+  },1000);
+}
+
+// === DROP SINGLE BALL ===
+function dropBall(player){
+  const ball = document.createElement("div");
+  ball.className="ball";
+  ball.style.left = (Math.random()*590)+"px";
+  ball.style.bottom = "380px";
   cupContainer.appendChild(ball);
+  balls.push(ball);
 
-  let vy=-2, vx=(Math.random()-0.5)*1;
+  let vx = (Math.random()-0.5)*2;
+  let vy = -2;
+
   const interval = setInterval(()=>{
     let bottom = parseFloat(ball.style.bottom);
     let left = parseFloat(ball.style.left);
 
-    bottom += vy;
+    // Peg collision
+    pegs.forEach(peg=>{
+      const px = parseFloat(peg.style.left);
+      const py = parseFloat(peg.style.bottom);
+      if(Math.abs(px-left)<10 && Math.abs(py-bottom)<10){
+        vx += (Math.random()-0.5);
+        vy = 2;
+      }
+    });
+
+    vy -= 0.1; // gravity
     left += vx;
+    bottom += vy;
 
-    // Gravity
-    vy -= 0.1;
-
-    // Bounce off walls
     if(left<0){ left=0; vx*=-1; }
     if(left>590){ left=590; vx*=-1; }
 
     // Check collision with cup
     const cupLeft = parseFloat(cup.style.left);
     if(bottom<=70 && left+10>cupLeft && left<cupLeft+80){
-      score += parseInt(cup.dataset.points);
-      scoreBoard.textContent = 'Score: '+score;
+      player.score += parseInt(cup.dataset.points);
+      renderScore();
       ball.remove();
       clearInterval(interval);
       return;
@@ -99,36 +221,26 @@ function dropBall(){
       return;
     }
 
-    ball.style.left = left+'px';
-    ball.style.bottom = bottom+'px';
+    ball.style.left = left+"px";
+    ball.style.bottom = bottom+"px";
   },20);
-}
 
-// === START GAME ===
-function startGame(){
-  startBtn.style.display='none';
-  score=0;
-  scoreBoard.textContent='Score: 0';
-  result.textContent='';
-  cupContainer.innerHTML='';
-  createCup();
-
-  timeLeft=30;
-  timerDisplay.textContent='Time: '+timeLeft+'s';
-
-  ballInterval = setInterval(dropBall,1000); // drop 1 ball per second
-
-  gameInterval = setInterval(()=>{
-    timeLeft--;
-    timerDisplay.textContent='Time: '+timeLeft+'s';
-    if(timeLeft<=0){
-      clearInterval(gameInterval);
-      clearInterval(ballInterval);
-      result.textContent='🏁 Game Over! Your score: '+score;
-      startBtn.style.display='inline-block';
+  // Move to next question when last ball removed
+  setTimeout(()=>{
+    if(balls.every(b=>!b.parentNode)){
+      nextQuestion();
     }
-  },1000);
+  },4000); // approximate enough for all balls
 }
 
-startBtn.onclick=startGame;
+// === CUP MOVEMENT ===
+document.addEventListener('keydown', (e)=>{
+  if(!cup) return;
+  let left = parseFloat(cup.style.left);
+  if(e.key==='ArrowLeft') left -= 20;
+  if(e.key==='ArrowRight') left += 20;
+  if(left<0) left=0;
+  if(left>520) left=520;
+  cup.style.left = left+'px';
+});
 </script>
